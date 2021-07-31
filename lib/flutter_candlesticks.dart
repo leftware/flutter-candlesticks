@@ -345,6 +345,7 @@ class _OHLCVPainter extends CustomPainter {
   @override
   bool shouldRepaint(_OHLCVPainter old) {
     return data != old.data ||
+        data.length != old.data.length ||
         lineWidth != old.lineWidth ||
         enableGridLines != old.enableGridLines ||
         gridLineColor != old.gridLineColor ||
