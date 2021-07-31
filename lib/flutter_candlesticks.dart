@@ -128,16 +128,7 @@ class _OHLCVPainter extends CustomPainter {
         // Label grid lines
         gridLineValue = _max - (((_max - _min) / (gridLineAmount - 1)) * i);
 
-        String gridLineText;
-        if (gridLineValue < 1) {
-          gridLineText = gridLineValue.toStringAsPrecision(4);
-        } else if (gridLineValue < 999) {
-          gridLineText = gridLineValue.toStringAsFixed(2);
-        } else {
-          gridLineText = gridLineValue.round().toString().replaceAllMapped(
-              new RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-              (Match m) => "${m[1]},");
-        }
+        String gridLineText = _formatGridLineText(gridLineValue);
 
         if (_gridLineTextLength == null || _gridLineTextLength == 0) {
           _gridLineTextLength = (labelPrefix + gridLineText).length;
@@ -309,6 +300,17 @@ class _OHLCVPainter extends CustomPainter {
       if (i.volumeto > _maxVolume) {
         _maxVolume = i.volumeto;
       }
+    }
+  }
+
+  String _formatGridLineText(double gridLineValue) {
+    if (gridLineValue < 1) {
+      return gridLineValue.toStringAsPrecision(4);
+    } else if (gridLineValue < 999) {
+      return gridLineValue.toStringAsFixed(2);
+    } else {
+      return gridLineValue.round().toString().replaceAllMapped(
+          new RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => "${m[1]},");
     }
   }
 }
