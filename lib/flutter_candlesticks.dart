@@ -120,20 +120,7 @@ class _OHLCVPainter extends CustomPainter {
   }
 
   update() {
-    _min = double.infinity;
-    _max = -double.infinity;
-    _maxVolume = -double.infinity;
-    for (var i in data) {
-      if (i.high > _max) {
-        _max = i.high;
-      }
-      if (i.low < _min) {
-        _min = i.low;
-      }
-      if (i.volumeto > _maxVolume) {
-        _maxVolume = i.volumeto;
-      }
-    }
+    _calcMinMax();
 
     if (enableGridLines) {
       double gridLineValue;
@@ -305,5 +292,23 @@ class _OHLCVPainter extends CustomPainter {
         gridLineWidth != old.gridLineWidth ||
         volumeProp != old.volumeProp ||
         gridLineLabelColor != old.gridLineLabelColor;
+  }
+
+  void _calcMinMax() {
+    _min = double.infinity;
+    _max = -double.infinity;
+    _maxVolume = -double.infinity;
+
+    for (var i in data) {
+      if (i.high > _max) {
+        _max = i.high;
+      }
+      if (i.low < _min) {
+        _min = i.low;
+      }
+      if (i.volumeto > _maxVolume) {
+        _maxVolume = i.volumeto;
+      }
+    }
   }
 }
