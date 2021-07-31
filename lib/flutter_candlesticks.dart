@@ -105,7 +105,7 @@ class _OHLCVPainter extends CustomPainter {
   final Color increaseColor;
   final Color decreaseColor;
 
-  double _min = double.infinity;
+  double _min = -double.infinity;
   double _max = -double.infinity;
   double _maxVolume = -double.infinity;
 
@@ -160,7 +160,9 @@ class _OHLCVPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (_min == null || _max == null || _maxVolume == null) {
+    if (_min == -double.infinity ||
+        _max == -double.infinity ||
+        _maxVolume == -double.infinity) {
       update();
     }
 
