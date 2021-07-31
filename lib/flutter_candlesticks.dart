@@ -3,22 +3,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_candlesticks/model/chart_data.dart';
 
 class OHLCVGraph extends StatelessWidget {
-  OHLCVGraph({
-    Key? key,
-    required this.data,
-    this.lineWidth = 1.0,
-    this.fallbackHeight = 100.0,
-    this.fallbackWidth = 300.0,
-    this.gridLineColor = Colors.grey,
-    this.gridLineAmount = 5,
-    this.gridLineWidth = 0.5,
-    this.gridLineLabelColor = Colors.grey,
-    this.labelPrefix = "\$",
-    required this.enableGridLines,
-    required this.volumeProp,
-    this.increaseColor = Colors.green,
-    this.decreaseColor = Colors.red,
-  }) : super(key: key);
+  OHLCVGraph(
+      {Key? key,
+      required this.data,
+      this.lineWidth = 1.0,
+      this.fallbackHeight = 100.0,
+      this.fallbackWidth = 300.0,
+      this.gridLineColor = Colors.grey,
+      this.gridLineAmount = 5,
+      this.gridLineWidth = 0.5,
+      this.gridLineLabelColor = Colors.grey,
+      this.labelPrefix = "\$",
+      required this.enableGridLines,
+      required this.volumeProp,
+      this.candlestickWidth = 30,
+      this.spaceBetweenItems = 30,
+      this.increaseColor = Colors.green,
+      this.decreaseColor = Colors.red,
+      this.fillCandle = true})
+      : super(key: key);
 
   /// OHLCV data to graph  /// List of Maps containing open, high, low, close and volumeto
   /// Example: [["open" : 40.0, "high" : 75.0, "low" : 25.0, "close" : 50.0, "volumeto" : 5000.0}, {...}]
@@ -57,6 +60,15 @@ class OHLCVGraph extends StatelessWidget {
   /// Decrease color
   final Color decreaseColor;
 
+  /// fixed width of Candlestick
+  final double candlestickWidth;
+
+  /// space between each items(candlestick / volume)
+  final double spaceBetweenItems;
+
+  /// fill / stroke option for candilestick
+  final bool fillCandle;
+
   @override
   Widget build(BuildContext context) {
     return new LimitedBox(
@@ -74,7 +86,10 @@ class OHLCVGraph extends StatelessWidget {
             volumeProp: volumeProp,
             labelPrefix: labelPrefix,
             increaseColor: increaseColor,
-            decreaseColor: decreaseColor),
+            decreaseColor: decreaseColor,
+            candlestickWidth: candlestickWidth,
+            spaceBetweenItems: spaceBetweenItems,
+            fillCandle: fillCandle),
       ),
     );
   }
@@ -91,7 +106,10 @@ class _OHLCVPainter extends CustomPainter {
       required this.volumeProp,
       required this.labelPrefix,
       required this.increaseColor,
-      required this.decreaseColor});
+      required this.decreaseColor,
+      required this.candlestickWidth,
+      required this.spaceBetweenItems,
+      required this.fillCandle});
 
   final List<ChartData> data;
   final double lineWidth;
@@ -104,6 +122,9 @@ class _OHLCVPainter extends CustomPainter {
   final double volumeProp;
   final Color increaseColor;
   final Color decreaseColor;
+  final double candlestickWidth;
+  final double spaceBetweenItems;
+  final bool fillCandle;
 
   double _min = -double.infinity;
   double _max = -double.infinity;
@@ -196,8 +217,12 @@ class _OHLCVPainter extends CustomPainter {
       maxVolumePainter?.paint(canvas, new Offset(0.0, gridLineY + 2.0));
     }
 
-    final double heightNormalizer = height / (_max - _min);
-    final double rectWidth = width / data.length;
+    // NOTE: to avoid layout bug when 0 dividing
+    final double heightNormalizer =
+        _max - _min == 0 ? 1 : height / (_max - _min);
+    final double rectWidth = candlestickWidth == -double.infinity
+        ? width / data.length
+        : candlestickWidth + spaceBetweenItems;
 
     double rectLeft;
     double rectTop;
@@ -215,62 +240,89 @@ class _OHLCVPainter extends CustomPainter {
           (data[i].volumeto * volumeNormalizer - lineWidth / 2);
       double volumeBarBottom = height + volumeHeight + lineWidth / 2;
 
-      if (data[i].open > data[i].close) {
-        // Draw candlestick if decrease
-        rectTop = height - (data[i].open - _min) * heightNormalizer;
-        rectBottom = height - (data[i].close - _min) * heightNormalizer;
+      final highValue = data[i].isDown ? data[i].open : data[i].close;
+      final lowValue = data[i].isDown ? data[i].close : data[i].open;
+
+      if (fillCandle) {
+        rectTop = height - (highValue - _min) * heightNormalizer;
+        rectBottom = height - (lowValue - _min) * heightNormalizer;
         rectPaint = new Paint()
-          ..color = decreaseColor
+          ..color = data[i].isDown ? decreaseColor : increaseColor
           ..strokeWidth = lineWidth;
 
-        Rect ocRect =
-            new Rect.fromLTRB(rectLeft, rectTop, rectRight, rectBottom);
+        Rect ocRect = new Rect.fromLTRB(
+            rectLeft, rectTop, rectRight - spaceBetweenItems, rectBottom);
         canvas.drawRect(ocRect, rectPaint);
 
         // Draw volume bars
-        Rect volumeRect = new Rect.fromLTRB(
-            rectLeft, volumeBarTop, rectRight, volumeBarBottom);
+        Rect volumeRect = new Rect.fromLTRB(rectLeft, volumeBarTop,
+            rectRight - spaceBetweenItems, volumeBarBottom);
         canvas.drawRect(volumeRect, rectPaint);
       } else {
-        // Draw candlestick if increase
-        rectTop = (height - (data[i].close - _min) * heightNormalizer) +
-            lineWidth / 2;
+        rectTop =
+            (height - (highValue - _min) * heightNormalizer) + lineWidth / 2;
         rectBottom =
-            (height - (data[i].open - _min) * heightNormalizer) - lineWidth / 2;
+            (height - (lowValue - _min) * heightNormalizer) - lineWidth / 2;
         rectPaint = new Paint()
-          ..color = increaseColor
+          ..color = data[i].isDown ? decreaseColor : increaseColor
           ..strokeWidth = lineWidth;
 
-        canvas.drawLine(new Offset(rectLeft, rectBottom - lineWidth / 2),
-            new Offset(rectRight, rectBottom - lineWidth / 2), rectPaint);
-        canvas.drawLine(new Offset(rectLeft, rectTop + lineWidth / 2),
-            new Offset(rectRight, rectTop + lineWidth / 2), rectPaint);
+        canvas.drawLine(
+            new Offset(rectLeft, rectBottom - lineWidth / 2),
+            new Offset(
+                rectRight - spaceBetweenItems, rectBottom - lineWidth / 2),
+            rectPaint);
+        canvas.drawLine(
+            new Offset(rectLeft, rectTop + lineWidth / 2),
+            new Offset(rectRight - spaceBetweenItems, rectTop + lineWidth / 2),
+            rectPaint);
         canvas.drawLine(new Offset(rectLeft + lineWidth / 2, rectBottom),
             new Offset(rectLeft + lineWidth / 2, rectTop), rectPaint);
-        canvas.drawLine(new Offset(rectRight - lineWidth / 2, rectBottom),
-            new Offset(rectRight - lineWidth / 2, rectTop), rectPaint);
+        canvas.drawLine(
+            new Offset(
+                rectRight - lineWidth / 2 - spaceBetweenItems, rectBottom),
+            new Offset(rectRight - lineWidth / 2 - spaceBetweenItems, rectTop),
+            rectPaint);
 
         // Draw volume bars
-        canvas.drawLine(new Offset(rectLeft, volumeBarBottom - lineWidth / 2),
-            new Offset(rectRight, volumeBarBottom - lineWidth / 2), rectPaint);
-        canvas.drawLine(new Offset(rectLeft, volumeBarTop + lineWidth / 2),
-            new Offset(rectRight, volumeBarTop + lineWidth / 2), rectPaint);
+        canvas.drawLine(
+            new Offset(rectLeft, volumeBarBottom - lineWidth / 2),
+            new Offset(
+                rectRight - spaceBetweenItems, volumeBarBottom - lineWidth / 2),
+            rectPaint);
+        canvas.drawLine(
+            new Offset(rectLeft, volumeBarTop + lineWidth / 2),
+            new Offset(
+                rectRight - spaceBetweenItems, volumeBarTop + lineWidth / 2),
+            rectPaint);
         canvas.drawLine(new Offset(rectLeft + lineWidth / 2, volumeBarBottom),
             new Offset(rectLeft + lineWidth / 2, volumeBarTop), rectPaint);
-        canvas.drawLine(new Offset(rectRight - lineWidth / 2, volumeBarBottom),
-            new Offset(rectRight - lineWidth / 2, volumeBarTop), rectPaint);
+        canvas.drawLine(
+            new Offset(
+                rectRight - lineWidth / 2 - spaceBetweenItems, volumeBarBottom),
+            new Offset(
+                rectRight - lineWidth / 2 - spaceBetweenItems, volumeBarTop),
+            rectPaint);
       }
 
       // Draw low/high candlestick wicks
       double low = height - (data[i].low - _min) * heightNormalizer;
       double high = height - (data[i].high - _min) * heightNormalizer;
       canvas.drawLine(
-          new Offset(rectLeft + rectWidth / 2 - lineWidth / 2, rectBottom),
-          new Offset(rectLeft + rectWidth / 2 - lineWidth / 2, low),
+          new Offset(
+              rectLeft + rectWidth / 2 - lineWidth / 2 - spaceBetweenItems / 2,
+              rectBottom),
+          new Offset(
+              rectLeft + rectWidth / 2 - lineWidth / 2 - spaceBetweenItems / 2,
+              low),
           rectPaint);
       canvas.drawLine(
-          new Offset(rectLeft + rectWidth / 2 - lineWidth / 2, rectTop),
-          new Offset(rectLeft + rectWidth / 2 - lineWidth / 2, high),
+          new Offset(
+              rectLeft + rectWidth / 2 - lineWidth / 2 - spaceBetweenItems / 2,
+              rectTop),
+          new Offset(
+              rectLeft + rectWidth / 2 - lineWidth / 2 - spaceBetweenItems / 2,
+              high),
           rectPaint);
     }
   }
