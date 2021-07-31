@@ -3,25 +3,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_candlesticks/model/chart_data.dart';
 
 class OHLCVGraph extends StatelessWidget {
-  OHLCVGraph(
-      {Key? key,
-      required this.data,
-      this.lineWidth = 1.0,
-      this.fallbackHeight = 100.0,
-      this.fallbackWidth = 300.0,
-      this.gridLineColor = Colors.grey,
-      this.gridLineAmount = 5,
-      this.gridLineWidth = 0.5,
-      this.gridLineLabelColor = Colors.grey,
-      this.labelPrefix = "\$",
-      required this.enableGridLines,
-      required this.volumeProp,
-      this.candlestickWidth = 30,
-      this.spaceBetweenItems = 30,
-      this.increaseColor = Colors.green,
-      this.decreaseColor = Colors.red,
-      this.fillCandle = true})
-      : super(key: key);
+  OHLCVGraph({
+    Key? key,
+    required this.data,
+    this.lineWidth = 1.0,
+    this.fallbackHeight = 100.0,
+    this.fallbackWidth = 300.0,
+    this.gridLineColor = Colors.grey,
+    this.gridLineAmount = 5,
+    this.gridLineWidth = 0.5,
+    this.gridLineLabelColor = Colors.grey,
+    this.labelPrefix = "\$",
+    required this.enableGridLines,
+    required this.volumeProp,
+    this.candlestickWidth = 30,
+    this.spaceBetweenItems = 30,
+    this.increaseColor = Colors.green,
+    this.decreaseColor = Colors.red,
+    this.fillCandle = true,
+    this.scrollable = true,
+  }) : super(key: key);
 
   /// OHLCV data to graph  /// List of Maps containing open, high, low, close and volumeto
   /// Example: [["open" : 40.0, "high" : 75.0, "low" : 25.0, "close" : 50.0, "volumeto" : 5000.0}, {...}]
@@ -69,28 +70,42 @@ class OHLCVGraph extends StatelessWidget {
   /// fill / stroke option for candilestick
   final bool fillCandle;
 
+  final bool scrollable;
+
   @override
   Widget build(BuildContext context) {
     return new LimitedBox(
-      maxHeight: fallbackHeight,
-      maxWidth: fallbackWidth,
-      child: new CustomPaint(
-        size: Size.infinite,
-        painter: new _OHLCVPainter(data,
-            lineWidth: lineWidth,
-            gridLineColor: gridLineColor,
-            gridLineAmount: gridLineAmount,
-            gridLineWidth: gridLineWidth,
-            gridLineLabelColor: gridLineLabelColor,
-            enableGridLines: enableGridLines,
-            volumeProp: volumeProp,
-            labelPrefix: labelPrefix,
-            increaseColor: increaseColor,
-            decreaseColor: decreaseColor,
-            candlestickWidth: candlestickWidth,
-            spaceBetweenItems: spaceBetweenItems,
-            fillCandle: fillCandle),
-      ),
+        maxHeight: fallbackHeight,
+        maxWidth: fallbackWidth,
+        child: scrollable
+            ? SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Container(
+                    width: data.length *
+                        (candlestickWidth + spaceBetweenItems + lineWidth * 2),
+                    height: fallbackHeight,
+                    child: _buildOHLCVPainter()),
+              )
+            : _buildOHLCVPainter());
+  }
+
+  Widget _buildOHLCVPainter() {
+    return new CustomPaint(
+      size: Size.infinite,
+      painter: new _OHLCVPainter(data,
+          lineWidth: lineWidth,
+          gridLineColor: gridLineColor,
+          gridLineAmount: gridLineAmount,
+          gridLineWidth: gridLineWidth,
+          gridLineLabelColor: gridLineLabelColor,
+          enableGridLines: enableGridLines,
+          volumeProp: volumeProp,
+          labelPrefix: labelPrefix,
+          increaseColor: increaseColor,
+          decreaseColor: decreaseColor,
+          candlestickWidth: candlestickWidth,
+          spaceBetweenItems: spaceBetweenItems,
+          fillCandle: fillCandle),
     );
   }
 }
