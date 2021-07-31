@@ -5,6 +5,14 @@ class ChartData {
   final double close;
   final double volumeto;
 
+  bool get isUp {
+    return open < close;
+  }
+
+  bool get isDown {
+    return open > close;
+  }
+
   ChartData(
       {required this.open,
       required this.high,
