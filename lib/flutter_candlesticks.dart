@@ -151,7 +151,7 @@ class _OHLCVPainter extends CustomPainter {
               (Match m) => "${m[1]},");
         }
 
-        if (_gridLineTextLength == null) {
+        if (_gridLineTextLength == null || _gridLineTextLength == 0) {
           _gridLineTextLength = (labelPrefix + gridLineText).length;
         }
 
@@ -174,8 +174,8 @@ class _OHLCVPainter extends CustomPainter {
                   color: gridLineLabelColor,
                   fontSize: 10.0,
                   fontWeight: FontWeight.bold)),
-          textDirection: TextDirection.ltr);
-      maxVolumePainter!.layout();
+          textDirection: TextDirection.ltr)
+        ..layout();
     }
   }
 
