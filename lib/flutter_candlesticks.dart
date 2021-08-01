@@ -206,35 +206,44 @@ class _OHLCVPainter extends CustomPainter {
       update();
     }
 
-    final double volumeHeight = size.height * volumeProp;
-    final double volumeNormalizer = volumeHeight / _maxVolume;
-
-    double width = size.width;
-    final double height = size.height * (1 - volumeProp);
-
     if (enableGridLines) {
-      width = size.width - _gridLineTextLength! * 6;
-      Paint gridPaint = new Paint()
-        ..color = gridLineColor
-        ..strokeWidth = gridLineWidth;
-
-      double gridLineDist = height / (gridLineAmount - 1);
-      double gridLineY = 0.0;
-
-      // Draw grid lines
-      for (int i = 0; i < gridLineAmount; i++) {
-        gridLineY = (gridLineDist * i).round().toDouble();
-        canvas.drawLine(new Offset(0.0, gridLineY),
-            new Offset(width, gridLineY), gridPaint);
-
-        // Label grid lines
-        gridLineTextPainters[i]
-            .paint(canvas, new Offset(width + 2.0, gridLineY - 6.0));
-      }
-
-      // Label volume line
-      maxVolumePainter?.paint(canvas, new Offset(0.0, gridLineY + 2.0));
+      _drawGridLines(canvas, size);
     }
+
+    _drawCandleAndVolumes(canvas, size);
+  }
+
+  void _drawGridLines(Canvas canvas, Size size) {
+    double width = size.width - _gridLineTextLength! * 6;
+    final double height = size.height * (1 - volumeProp);
+    Paint gridPaint = new Paint()
+      ..color = gridLineColor
+      ..strokeWidth = gridLineWidth;
+
+    double gridLineDist = height / (gridLineAmount - 1);
+    double gridLineY = 0.0;
+
+    // Draw grid lines
+    for (int i = 0; i < gridLineAmount; i++) {
+      gridLineY = (gridLineDist * i).round().toDouble();
+      canvas.drawLine(
+          new Offset(0.0, gridLineY), new Offset(width, gridLineY), gridPaint);
+
+      // Label grid lines
+      gridLineTextPainters[i].paint(canvas, new Offset(width + 2.0, gridLineY));
+    }
+
+    // Label volume line
+    // TODO: make option
+    maxVolumePainter?.paint(canvas, new Offset(0.0, gridLineY + 2.0));
+  }
+
+  void _drawCandleAndVolumes(Canvas canvas, Size size) {
+    final double height = size.height * (1 - volumeProp);
+    final double volumeHeight = height * volumeProp;
+
+    final double width = size.width;
+    final double volumeNormalizer = volumeHeight / _maxVolume;
 
     // NOTE: to avoid layout bug when 0 dividing
     final double heightNormalizer =
