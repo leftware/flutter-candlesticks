@@ -309,10 +309,12 @@ class _OHLCGridPainter extends CustomPainter {
   }
 
   void _drawCurrentPriceLine(Canvas canvas, Size size) {
-    if (currentPricePainter != null) {
+    if (currentPricePainter != null && currentPrice != null) {
       final double width = size.width - _gridLineTextLength! * 6;
       final double height = size.height * (1 - volumeProp);
-      final currentPriceY = height * currentPrice! / info.maxValue;
+      final heightNormalizer = height / (info.maxValue - info.minValue);
+      final currentPriceY =
+          height - (currentPrice! - info.minValue) * heightNormalizer;
 
       final gridPaint = new Paint()
         ..color = currentPriceColor
