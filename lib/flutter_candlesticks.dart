@@ -279,7 +279,8 @@ class _OHLCGridPainter extends CustomPainter {
     return gridLineColor != old.gridLineColor ||
         gridLineAmount != old.gridLineAmount ||
         gridLineWidth != old.gridLineWidth ||
-        gridLineLabelColor != old.gridLineLabelColor;
+        gridLineLabelColor != old.gridLineLabelColor ||
+        currentPrice != old.currentPrice;
   }
 
   void _drawGridLines(Canvas canvas, Size size) {
