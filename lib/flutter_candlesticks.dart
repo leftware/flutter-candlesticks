@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_candlesticks/model/chart_data.dart';
@@ -78,139 +80,127 @@ class OHLCVGraph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return new LimitedBox(
+    final info = _calcMinMax();
+
+    return LimitedBox(
         maxHeight: fallbackHeight,
         maxWidth: fallbackWidth,
-        child: scrollable
-            ? SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Container(
-                    width: data.length *
-                        (candlestickWidth + spaceBetweenItems + lineWidth * 2),
-                    height: fallbackHeight,
-                    child: _buildOHLCVPainter()),
-              )
-            : _buildOHLCVPainter());
+        child: Stack(
+          children: [
+            LimitedBox(
+              maxHeight: fallbackHeight,
+              maxWidth: fallbackWidth,
+              child: _buildOHLCGridPainter(info),
+            ),
+            scrollable
+                ? SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: LimitedBox(
+                        maxWidth: data.length *
+                            (candlestickWidth +
+                                spaceBetweenItems +
+                                lineWidth * 2),
+                        maxHeight: fallbackHeight,
+                        child: _buildOHLCVPainter(info)),
+                  )
+                : _buildOHLCVPainter(info)
+          ],
+        ));
   }
 
-  Widget _buildOHLCVPainter() {
+  Widget _buildOHLCVPainter(_LayoutSupportInfo info) {
     return new CustomPaint(
       size: Size.infinite,
       painter: new _OHLCVPainter(data,
           lineWidth: lineWidth,
-          gridLineColor: gridLineColor,
-          gridLineAmount: gridLineAmount,
-          gridLineWidth: gridLineWidth,
-          gridLineLabelColor: gridLineLabelColor,
           enableGridLines: enableGridLines,
           volumeProp: volumeProp,
-          labelPrefix: labelPrefix,
           increaseColor: increaseColor,
           decreaseColor: decreaseColor,
           candlestickWidth: candlestickWidth,
           spaceBetweenItems: spaceBetweenItems,
-          fillCandle: fillCandle),
+          fillCandle: fillCandle,
+          info: info),
     );
+  }
+
+  Widget _buildOHLCGridPainter(_LayoutSupportInfo info) {
+    return new CustomPaint(
+      size: Size.infinite,
+      painter: _OHLCGridPainter(
+        volumeProp: volumeProp,
+        info: info,
+        gridLineAmount: gridLineAmount,
+        gridLineColor: gridLineColor,
+        gridLineWidth: gridLineWidth,
+        gridLineLabelColor: gridLineLabelColor,
+        labelPrefix: labelPrefix,
+      ),
+    );
+  }
+
+  _LayoutSupportInfo _calcMinMax() {
+    double minValue = double.infinity;
+    double maxValue = -double.infinity;
+    double maxVolumeValue = -double.infinity;
+
+    for (final item in data) {
+      minValue = min(minValue, item.low);
+      maxValue = max(maxValue, item.high);
+      maxVolumeValue = max(maxVolumeValue, item.volumeto);
+    }
+
+    return _LayoutSupportInfo(
+        minValue: minValue, maxValue: maxValue, maxVolumeValue: maxVolumeValue);
   }
 }
 
-class _OHLCVPainter extends CustomPainter {
-  _OHLCVPainter(this.data,
-      {required this.lineWidth,
-      required this.enableGridLines,
-      required this.gridLineColor,
+class _LayoutSupportInfo {
+  final double minValue;
+  final double maxValue;
+  final double maxVolumeValue;
+
+  _LayoutSupportInfo(
+      {required this.minValue,
+      required this.maxValue,
+      required this.maxVolumeValue});
+}
+
+class _OHLCGridPainter extends CustomPainter {
+  final Color gridLineColor;
+  final int gridLineAmount;
+  final double gridLineWidth;
+  final Color gridLineLabelColor;
+  final double volumeProp;
+  final String labelPrefix;
+  final _LayoutSupportInfo info;
+
+  _OHLCGridPainter(
+      {required this.gridLineColor,
       required this.gridLineAmount,
       required this.gridLineWidth,
       required this.gridLineLabelColor,
       required this.volumeProp,
       required this.labelPrefix,
-      required this.increaseColor,
-      required this.decreaseColor,
-      required this.candlestickWidth,
-      required this.spaceBetweenItems,
-      required this.fillCandle});
-
-  final List<ChartData> data;
-  final double lineWidth;
-  final bool enableGridLines;
-  final Color gridLineColor;
-  final int gridLineAmount;
-  final double gridLineWidth;
-  final Color gridLineLabelColor;
-  final String labelPrefix;
-  final double volumeProp;
-  final Color increaseColor;
-  final Color decreaseColor;
-  final double candlestickWidth;
-  final double spaceBetweenItems;
-  final bool fillCandle;
-
-  double _min = -double.infinity;
-  double _max = -double.infinity;
-  double _maxVolume = -double.infinity;
-
-  int? _gridLineTextLength;
+      required this.info});
 
   List<TextPainter> gridLineTextPainters = [];
   TextPainter? maxVolumePainter;
 
-  numCommaParse(number) {
-    return number.round().toString().replaceAllMapped(
-        new RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => "${m[1]},");
-  }
-
-  update() {
-    _calcMinMax();
-
-    if (enableGridLines) {
-      double gridLineValue;
-      for (int i = 0; i < gridLineAmount; i++) {
-        // Label grid lines
-        gridLineValue = _max - (((_max - _min) / (gridLineAmount - 1)) * i);
-
-        String gridLineText = _formatGridLineText(gridLineValue);
-
-        if (_gridLineTextLength == null || _gridLineTextLength == 0) {
-          _gridLineTextLength = (labelPrefix + gridLineText).length;
-        }
-
-        gridLineTextPainters.add(new TextPainter(
-            text: new TextSpan(
-                text: labelPrefix + gridLineText,
-                style: new TextStyle(
-                    color: gridLineLabelColor,
-                    fontSize: 10.0,
-                    fontWeight: FontWeight.bold)),
-            textDirection: TextDirection.ltr));
-        gridLineTextPainters[i].layout();
-      }
-
-      // Label volume line
-      maxVolumePainter = new TextPainter(
-          text: new TextSpan(
-              text: labelPrefix + numCommaParse(_maxVolume),
-              style: new TextStyle(
-                  color: gridLineLabelColor,
-                  fontSize: 10.0,
-                  fontWeight: FontWeight.bold)),
-          textDirection: TextDirection.ltr)
-        ..layout();
-    }
-  }
+  int? _gridLineTextLength;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (_min == -double.infinity ||
-        _max == -double.infinity ||
-        _maxVolume == -double.infinity) {
-      update();
-    }
+    _update();
+    _drawGridLines(canvas, size);
+  }
 
-    if (enableGridLines) {
-      _drawGridLines(canvas, size);
-    }
-
-    _drawCandleAndVolumes(canvas, size);
+  @override
+  bool shouldRepaint(covariant _OHLCGridPainter old) {
+    return gridLineColor != old.gridLineColor ||
+        gridLineAmount != old.gridLineAmount ||
+        gridLineWidth != old.gridLineWidth ||
+        gridLineLabelColor != old.gridLineLabelColor;
   }
 
   void _drawGridLines(Canvas canvas, Size size) {
@@ -238,16 +228,98 @@ class _OHLCVPainter extends CustomPainter {
     maxVolumePainter?.paint(canvas, new Offset(0.0, gridLineY + 2.0));
   }
 
+  void _update() {
+    double gridLineValue;
+    for (int i = 0; i < gridLineAmount; i++) {
+      // Label grid lines
+      gridLineValue = info.maxValue -
+          (((info.maxValue - info.minValue) / (gridLineAmount - 1)) * i);
+
+      String gridLineText = _formatGridLineText(gridLineValue);
+
+      if (_gridLineTextLength == null || _gridLineTextLength == 0) {
+        _gridLineTextLength = (labelPrefix + gridLineText).length;
+      }
+
+      gridLineTextPainters.add(new TextPainter(
+          text: new TextSpan(
+              text: labelPrefix + gridLineText,
+              style: new TextStyle(
+                  color: gridLineLabelColor,
+                  fontSize: 10.0,
+                  fontWeight: FontWeight.bold)),
+          textDirection: TextDirection.ltr));
+      gridLineTextPainters[i].layout();
+    }
+
+    // Label volume line
+    maxVolumePainter = new TextPainter(
+        text: new TextSpan(
+            text: labelPrefix + numCommaParse(info.maxVolumeValue),
+            style: new TextStyle(
+                color: gridLineLabelColor,
+                fontSize: 10.0,
+                fontWeight: FontWeight.bold)),
+        textDirection: TextDirection.ltr)
+      ..layout();
+  }
+
+  String _formatGridLineText(double gridLineValue) {
+    if (gridLineValue < 1) {
+      return gridLineValue.toStringAsPrecision(4);
+    } else if (gridLineValue < 999) {
+      return gridLineValue.toStringAsFixed(2);
+    } else {
+      return gridLineValue.round().toString().replaceAllMapped(
+          new RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => "${m[1]},");
+    }
+  }
+
+  numCommaParse(number) {
+    return number.round().toString().replaceAllMapped(
+        new RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => "${m[1]},");
+  }
+}
+
+class _OHLCVPainter extends CustomPainter {
+  _OHLCVPainter(this.data,
+      {required this.lineWidth,
+      required this.enableGridLines,
+      required this.volumeProp,
+      required this.increaseColor,
+      required this.decreaseColor,
+      required this.candlestickWidth,
+      required this.spaceBetweenItems,
+      required this.fillCandle,
+      required this.info});
+
+  final List<ChartData> data;
+  final double lineWidth;
+  final bool enableGridLines;
+  final double volumeProp;
+  final Color increaseColor;
+  final Color decreaseColor;
+  final double candlestickWidth;
+  final double spaceBetweenItems;
+  final bool fillCandle;
+  final _LayoutSupportInfo info;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    _drawCandleAndVolumes(canvas, size);
+  }
+
   void _drawCandleAndVolumes(Canvas canvas, Size size) {
     final double height = size.height * (1 - volumeProp);
     final double volumeHeight = height * volumeProp;
 
     final double width = size.width;
-    final double volumeNormalizer = volumeHeight / _maxVolume;
+    final double volumeNormalizer = volumeHeight / info.maxVolumeValue;
 
     // NOTE: to avoid layout bug when 0 dividing
-    final double heightNormalizer =
-        _max - _min == 0 ? 1 : height / (_max - _min);
+    final double heightNormalizer = info.maxValue - info.minValue == 0
+        ? 1
+        : height / (info.maxValue - info.minValue);
     final double rectWidth = candlestickWidth == -double.infinity
         ? width / data.length
         : candlestickWidth + spaceBetweenItems;
@@ -264,13 +336,15 @@ class _OHLCVPainter extends CustomPainter {
       final highValue = data[i].isDown ? data[i].open : data[i].close;
       final lowValue = data[i].isDown ? data[i].close : data[i].open;
 
-      final low = height - (data[i].low - _min) * heightNormalizer;
-      final high = height - (data[i].high - _min) * heightNormalizer;
+      final low = height - (data[i].low - info.minValue) * heightNormalizer;
+      final high = height - (data[i].high - info.minValue) * heightNormalizer;
 
       final rectTop =
-          (height - (highValue - _min) * heightNormalizer) + lineWidth / 2;
+          (height - (highValue - info.minValue) * heightNormalizer) +
+              lineWidth / 2;
       final rectBottom =
-          (height - (lowValue - _min) * heightNormalizer) - lineWidth / 2;
+          (height - (lowValue - info.minValue) * heightNormalizer) -
+              lineWidth / 2;
 
       final rectPaint = new Paint()
         ..color = data[i].isDown ? decreaseColor : increaseColor
@@ -318,39 +392,6 @@ class _OHLCVPainter extends CustomPainter {
         data.length != old.data.length ||
         lineWidth != old.lineWidth ||
         enableGridLines != old.enableGridLines ||
-        gridLineColor != old.gridLineColor ||
-        gridLineAmount != old.gridLineAmount ||
-        gridLineWidth != old.gridLineWidth ||
-        volumeProp != old.volumeProp ||
-        gridLineLabelColor != old.gridLineLabelColor;
-  }
-
-  void _calcMinMax() {
-    _min = double.infinity;
-    _max = -double.infinity;
-    _maxVolume = -double.infinity;
-
-    for (var i in data) {
-      if (i.high > _max) {
-        _max = i.high;
-      }
-      if (i.low < _min) {
-        _min = i.low;
-      }
-      if (i.volumeto > _maxVolume) {
-        _maxVolume = i.volumeto;
-      }
-    }
-  }
-
-  String _formatGridLineText(double gridLineValue) {
-    if (gridLineValue < 1) {
-      return gridLineValue.toStringAsPrecision(4);
-    } else if (gridLineValue < 999) {
-      return gridLineValue.toStringAsFixed(2);
-    } else {
-      return gridLineValue.round().toString().replaceAllMapped(
-          new RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => "${m[1]},");
-    }
+        volumeProp != old.volumeProp;
   }
 }
