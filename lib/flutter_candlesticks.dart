@@ -11,6 +11,8 @@ import 'painter/candlestick-painter.dart';
 class OHLCVGraph extends StatelessWidget {
   OHLCVGraph({
     Key? key,
+    this.currentPrice,
+    this.currentPriceColor = Colors.blue,
     required this.data,
     this.lineWidth = 1.0,
     this.fallbackHeight = 100.0,
@@ -78,6 +80,10 @@ class OHLCVGraph extends StatelessWidget {
 
   final bool scrollable;
 
+  final double? currentPrice;
+
+  final Color currentPriceColor;
+
   @override
   Widget build(BuildContext context) {
     final info = _calcMinMax();
@@ -128,6 +134,8 @@ class OHLCVGraph extends StatelessWidget {
     return new CustomPaint(
       size: Size.infinite,
       painter: _OHLCGridPainter(
+        currentPrice: currentPrice,
+        currentPriceColor: currentPriceColor,
         volumeProp: volumeProp,
         info: info,
         gridLineAmount: gridLineAmount,
@@ -167,6 +175,9 @@ class _LayoutSupportInfo {
 }
 
 class _OHLCGridPainter extends CustomPainter {
+  final double? currentPrice;
+  final Color currentPriceColor;
+  final double currentPriceLineWidth = 2;
   final Color gridLineColor;
   final int gridLineAmount;
   final double gridLineWidth;
@@ -176,7 +187,9 @@ class _OHLCGridPainter extends CustomPainter {
   final _LayoutSupportInfo info;
 
   _OHLCGridPainter(
-      {required this.gridLineColor,
+      {this.currentPrice,
+      required this.currentPriceColor,
+      required this.gridLineColor,
       required this.gridLineAmount,
       required this.gridLineWidth,
       required this.gridLineLabelColor,
@@ -185,6 +198,7 @@ class _OHLCGridPainter extends CustomPainter {
       required this.info});
 
   List<TextPainter> gridLineTextPainters = [];
+  TextPainter? currentPricePainter;
   TextPainter? maxVolumePainter;
 
   int? _gridLineTextLength;
@@ -193,6 +207,10 @@ class _OHLCGridPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     _update();
     _drawGridLines(canvas, size);
+    _drawCurrentPriceLine(
+      canvas,
+      size,
+    );
   }
 
   @override
@@ -228,6 +246,25 @@ class _OHLCGridPainter extends CustomPainter {
     maxVolumePainter?.paint(canvas, new Offset(0.0, gridLineY + 2.0));
   }
 
+  void _drawCurrentPriceLine(Canvas canvas, Size size) {
+    if (currentPricePainter != null) {
+      final double width = size.width - _gridLineTextLength! * 6;
+      final double height = size.height * (1 - volumeProp);
+      final currentPriceY = height * currentPrice! / info.maxValue;
+
+      final gridPaint = new Paint()
+        ..color = currentPriceColor
+        ..strokeWidth = currentPriceLineWidth;
+
+      canvas.drawLine(new Offset(0.0, currentPriceY),
+          new Offset(width, currentPriceY), gridPaint);
+
+      // Label grid lines
+      currentPricePainter!
+          .paint(canvas, new Offset(width + 2.0, currentPriceY));
+    }
+  }
+
   void _update() {
     double gridLineValue;
     for (int i = 0; i < gridLineAmount; i++) {
@@ -250,6 +287,18 @@ class _OHLCGridPainter extends CustomPainter {
                   fontWeight: FontWeight.bold)),
           textDirection: TextDirection.ltr));
       gridLineTextPainters[i].layout();
+    }
+
+    if (currentPrice != null) {
+      currentPricePainter = TextPainter(
+          text: new TextSpan(
+              text: labelPrefix + _formatGridLineText(currentPrice!),
+              style: new TextStyle(
+                  color: currentPriceColor,
+                  fontSize: 10.0,
+                  fontWeight: FontWeight.bold)),
+          textDirection: TextDirection.ltr);
+      currentPricePainter!.layout();
     }
 
     // Label volume line
