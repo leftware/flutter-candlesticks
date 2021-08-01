@@ -1,6 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_candlesticks/model/chart_data.dart';
+import 'package:flutter_candlesticks/painter/paint-info/paint-rect.dart';
+import 'package:flutter_candlesticks/painter/volume-bar-painter.dart';
+
+import 'painter/candlestick-painter.dart';
 
 class OHLCVGraph extends StatelessWidget {
   OHLCVGraph({
@@ -239,106 +243,63 @@ class _OHLCVPainter extends CustomPainter {
         ? width / data.length
         : candlestickWidth + spaceBetweenItems;
 
-    double rectLeft;
-    double rectTop;
-    double rectRight;
-    double rectBottom;
-
-    Paint rectPaint;
-
     // Loop through all data
     for (int i = 0; i < data.length; i++) {
-      rectLeft = (i * rectWidth) + lineWidth / 2;
-      rectRight = ((i + 1) * rectWidth) - lineWidth / 2;
+      final rectLeft = (i * rectWidth) + lineWidth / 2;
+      final rectRight = ((i + 1) * rectWidth) - lineWidth / 2;
 
-      double volumeBarTop = (height + volumeHeight) -
+      final volumeBarTop = (height + volumeHeight) -
           (data[i].volumeto * volumeNormalizer - lineWidth / 2);
-      double volumeBarBottom = height + volumeHeight + lineWidth / 2;
+      final volumeBarBottom = height + volumeHeight + lineWidth / 2;
 
       final highValue = data[i].isDown ? data[i].open : data[i].close;
       final lowValue = data[i].isDown ? data[i].close : data[i].open;
 
-      if (fillCandle) {
-        rectTop = height - (highValue - _min) * heightNormalizer;
-        rectBottom = height - (lowValue - _min) * heightNormalizer;
-        rectPaint = new Paint()
-          ..color = data[i].isDown ? decreaseColor : increaseColor
-          ..strokeWidth = lineWidth;
+      final low = height - (data[i].low - _min) * heightNormalizer;
+      final high = height - (data[i].high - _min) * heightNormalizer;
 
-        Rect ocRect = new Rect.fromLTRB(
-            rectLeft, rectTop, rectRight - spaceBetweenItems, rectBottom);
-        canvas.drawRect(ocRect, rectPaint);
+      final rectTop =
+          (height - (highValue - _min) * heightNormalizer) + lineWidth / 2;
+      final rectBottom =
+          (height - (lowValue - _min) * heightNormalizer) - lineWidth / 2;
 
-        // Draw volume bars
-        Rect volumeRect = new Rect.fromLTRB(rectLeft, volumeBarTop,
-            rectRight - spaceBetweenItems, volumeBarBottom);
-        canvas.drawRect(volumeRect, rectPaint);
-      } else {
-        rectTop =
-            (height - (highValue - _min) * heightNormalizer) + lineWidth / 2;
-        rectBottom =
-            (height - (lowValue - _min) * heightNormalizer) - lineWidth / 2;
-        rectPaint = new Paint()
-          ..color = data[i].isDown ? decreaseColor : increaseColor
-          ..strokeWidth = lineWidth;
+      final rectPaint = new Paint()
+        ..color = data[i].isDown ? decreaseColor : increaseColor
+        ..strokeWidth = lineWidth;
 
-        canvas.drawLine(
-            new Offset(rectLeft, rectBottom - lineWidth / 2),
-            new Offset(
-                rectRight - spaceBetweenItems, rectBottom - lineWidth / 2),
-            rectPaint);
-        canvas.drawLine(
-            new Offset(rectLeft, rectTop + lineWidth / 2),
-            new Offset(rectRight - spaceBetweenItems, rectTop + lineWidth / 2),
-            rectPaint);
-        canvas.drawLine(new Offset(rectLeft + lineWidth / 2, rectBottom),
-            new Offset(rectLeft + lineWidth / 2, rectTop), rectPaint);
-        canvas.drawLine(
-            new Offset(
-                rectRight - lineWidth / 2 - spaceBetweenItems, rectBottom),
-            new Offset(rectRight - lineWidth / 2 - spaceBetweenItems, rectTop),
-            rectPaint);
+      final candleStickerPainter = CandleStickPainter(
+          strategy: fillCandle
+              ? CandleStickStrategy.Fill
+              : CandleStickStrategy.Stroke,
+          canvas: canvas,
+          paint: rectPaint,
+          high: high,
+          low: low,
+          paintInfo: PaintRectInfo(
+              lineWidth: lineWidth,
+              spaceBetweenItems: spaceBetweenItems,
+              rect: PaintRect(
+                  left: rectLeft,
+                  right: rectRight,
+                  top: rectTop,
+                  bottom: rectBottom)));
+      candleStickerPainter.draw();
 
-        // Draw volume bars
-        canvas.drawLine(
-            new Offset(rectLeft, volumeBarBottom - lineWidth / 2),
-            new Offset(
-                rectRight - spaceBetweenItems, volumeBarBottom - lineWidth / 2),
-            rectPaint);
-        canvas.drawLine(
-            new Offset(rectLeft, volumeBarTop + lineWidth / 2),
-            new Offset(
-                rectRight - spaceBetweenItems, volumeBarTop + lineWidth / 2),
-            rectPaint);
-        canvas.drawLine(new Offset(rectLeft + lineWidth / 2, volumeBarBottom),
-            new Offset(rectLeft + lineWidth / 2, volumeBarTop), rectPaint);
-        canvas.drawLine(
-            new Offset(
-                rectRight - lineWidth / 2 - spaceBetweenItems, volumeBarBottom),
-            new Offset(
-                rectRight - lineWidth / 2 - spaceBetweenItems, volumeBarTop),
-            rectPaint);
-      }
-
-      // Draw low/high candlestick wicks
-      double low = height - (data[i].low - _min) * heightNormalizer;
-      double high = height - (data[i].high - _min) * heightNormalizer;
-      canvas.drawLine(
-          new Offset(
-              rectLeft + rectWidth / 2 - lineWidth / 2 - spaceBetweenItems / 2,
-              rectBottom),
-          new Offset(
-              rectLeft + rectWidth / 2 - lineWidth / 2 - spaceBetweenItems / 2,
-              low),
-          rectPaint);
-      canvas.drawLine(
-          new Offset(
-              rectLeft + rectWidth / 2 - lineWidth / 2 - spaceBetweenItems / 2,
-              rectTop),
-          new Offset(
-              rectLeft + rectWidth / 2 - lineWidth / 2 - spaceBetweenItems / 2,
-              high),
-          rectPaint);
+      final volumeBarPainter = VolumeBarPainter(
+          strategy: fillCandle
+              ? VolumeBarPaintStrategy.Fill
+              : VolumeBarPaintStrategy.Stroke,
+          canvas: canvas,
+          paint: rectPaint,
+          paintInfo: PaintRectInfo(
+              lineWidth: lineWidth,
+              spaceBetweenItems: spaceBetweenItems,
+              rect: PaintRect(
+                  left: rectLeft,
+                  top: volumeBarTop,
+                  right: rectRight,
+                  bottom: volumeBarBottom)));
+      volumeBarPainter.draw();
     }
   }
 
