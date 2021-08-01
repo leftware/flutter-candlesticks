@@ -115,23 +115,21 @@ class OHLCVGraph extends StatelessWidget {
   }
 
   Widget _buildOHLCVPainter(_LayoutSupportInfo info) {
-    return new CustomPaint(
-      size: Size.infinite,
-      painter: new _OHLCVPainter(data,
-          lineWidth: lineWidth,
-          enableGridLines: enableGridLines,
-          volumeProp: volumeProp,
-          increaseColor: increaseColor,
-          decreaseColor: decreaseColor,
-          candlestickWidth: candlestickWidth,
-          spaceBetweenItems: spaceBetweenItems,
-          fillCandle: fillCandle,
-          info: info),
-    );
+    return _OHLCGestureEventWrapper(
+        data: data,
+        lineWidth: lineWidth,
+        enableGridLines: enableGridLines,
+        volumeProp: volumeProp,
+        increaseColor: increaseColor,
+        decreaseColor: decreaseColor,
+        candlestickWidth: candlestickWidth,
+        spaceBetweenItems: spaceBetweenItems,
+        fillCandle: fillCandle,
+        info: info);
   }
 
   Widget _buildOHLCGridPainter(_LayoutSupportInfo info) {
-    return new CustomPaint(
+    return CustomPaint(
       size: Size.infinite,
       painter: _OHLCGridPainter(
         currentPrice: currentPrice,
@@ -172,6 +170,69 @@ class _LayoutSupportInfo {
       {required this.minValue,
       required this.maxValue,
       required this.maxVolumeValue});
+}
+
+class _OHLCGestureEventWrapper extends StatefulWidget {
+  final List<ChartData> data;
+  final double lineWidth;
+  final bool enableGridLines;
+  final double volumeProp;
+  final Color increaseColor;
+  final Color decreaseColor;
+  final double candlestickWidth;
+  final double spaceBetweenItems;
+  final bool fillCandle;
+  final _LayoutSupportInfo info;
+
+  _OHLCGestureEventWrapper(
+      {required this.data,
+      required this.lineWidth,
+      required this.enableGridLines,
+      required this.volumeProp,
+      required this.increaseColor,
+      required this.decreaseColor,
+      required this.candlestickWidth,
+      required this.spaceBetweenItems,
+      required this.fillCandle,
+      required this.info});
+
+  @override
+  _OHLCGestureEventWrapperState createState() =>
+      _OHLCGestureEventWrapperState();
+}
+
+class _OHLCGestureEventWrapperState extends State<_OHLCGestureEventWrapper> {
+  Offset? touchPoint;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+        onTapDown: (e) => _updateOffset(e.localPosition),
+        onVerticalDragUpdate: (e) => _updateOffset(e.localPosition),
+        // FIXME: when we add onHorizontalDragUpdate, scrollview does not work.
+        // onHorizontalDragUpdate: (e) => _updateOffset(e.localPosition),
+        child: CustomPaint(
+          child: Center(),
+          size: Size.infinite,
+          painter: new _OHLCVPainter(this.widget.data,
+              lineWidth: this.widget.lineWidth,
+              enableGridLines: this.widget.enableGridLines,
+              volumeProp: this.widget.volumeProp,
+              increaseColor: this.widget.increaseColor,
+              decreaseColor: this.widget.decreaseColor,
+              candlestickWidth: this.widget.candlestickWidth,
+              spaceBetweenItems: this.widget.spaceBetweenItems,
+              fillCandle: this.widget.fillCandle,
+              touchPoint: this.touchPoint,
+              info: this.widget.info),
+        ));
+  }
+
+  void _updateOffset(Offset e) {
+    setState(() {
+      touchPoint = e;
+    });
+  }
 }
 
 class _OHLCGridPainter extends CustomPainter {
@@ -340,7 +401,8 @@ class _OHLCVPainter extends CustomPainter {
       required this.candlestickWidth,
       required this.spaceBetweenItems,
       required this.fillCandle,
-      required this.info});
+      required this.info,
+      this.touchPoint});
 
   final List<ChartData> data;
   final double lineWidth;
@@ -352,10 +414,12 @@ class _OHLCVPainter extends CustomPainter {
   final double spaceBetweenItems;
   final bool fillCandle;
   final _LayoutSupportInfo info;
+  final Offset? touchPoint;
 
   @override
   void paint(Canvas canvas, Size size) {
     _drawCandleAndVolumes(canvas, size);
+    _drawTouchPoint(canvas, size);
   }
 
   void _drawCandleAndVolumes(Canvas canvas, Size size) {
@@ -435,12 +499,61 @@ class _OHLCVPainter extends CustomPainter {
     }
   }
 
+  void _drawTouchPoint(Canvas canvas, Size size) {
+    final double width = size.width;
+    final double height = size.height * (1 - volumeProp);
+    if (touchPoint != null) {
+      double dx = 0;
+      double dy = 0;
+
+      if (touchPoint!.dx < 0) {
+        dx = 0;
+      } else if (touchPoint!.dx > size.width) {
+        dx = size.width;
+      } else {
+        dx = touchPoint!.dx;
+      }
+
+      if (touchPoint!.dy < 0) {
+        dy = 0;
+      } else if (touchPoint!.dy > height) {
+        dy = height;
+      } else {
+        dy = touchPoint!.dy;
+      }
+
+      final drawOffset = Offset(dx, dy);
+
+      final touchPrice = touchPoint!.dy / size.height * info.maxValue;
+      final textPointer = TextPainter(
+          text: new TextSpan(
+              text: touchPrice.toString(),
+              style: new TextStyle(
+                  color: Colors.black38,
+                  fontSize: 10.0,
+                  fontWeight: FontWeight.bold)),
+          textDirection: TextDirection.ltr);
+      textPointer.layout();
+      textPointer.paint(canvas, Offset(drawOffset.dx + 10, drawOffset.dy + 10));
+
+      final painter = Paint()
+        ..color = Colors.black38
+        ..strokeWidth = 1;
+
+      canvas.drawLine(
+          Offset(0, drawOffset.dy), Offset(width, drawOffset.dy), painter);
+      canvas.drawLine(
+          Offset(drawOffset.dx, 0), Offset(drawOffset.dx, height), painter);
+    }
+  }
+
   @override
   bool shouldRepaint(_OHLCVPainter old) {
     return data != old.data ||
         data.length != old.data.length ||
         lineWidth != old.lineWidth ||
         enableGridLines != old.enableGridLines ||
-        volumeProp != old.volumeProp;
+        volumeProp != old.volumeProp ||
+        touchPoint != old.touchPoint;
   }
 }
