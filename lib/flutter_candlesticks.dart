@@ -505,6 +505,8 @@ class _OHLCVPainter extends CustomPainter {
   void _drawTouchPoint(Canvas canvas, Size size) {
     final double width = size.width;
     final double height = size.height * (1 - volumeProp);
+    final heightNormalizer = height / (info.maxValue - info.minValue);
+
     if (touchPoint != null) {
       double dx = 0;
       double dy = 0;
@@ -527,7 +529,9 @@ class _OHLCVPainter extends CustomPainter {
 
       final drawOffset = Offset(dx, dy);
 
-      final touchPrice = touchPoint!.dy / size.height * info.maxValue;
+      final touchPrice =
+          (height - touchPoint!.dy) / heightNormalizer + info.minValue;
+
       final textPointer = TextPainter(
           text: new TextSpan(
               text: touchPrice.toString(),
